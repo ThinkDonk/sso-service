@@ -1,0 +1,12 @@
+.venv/
+.git/
+__pycache__/
+*.pyc
+.env
+.env.example
+data/
+test_*.py
+*.md
+OIDC_AUTH_SERVICE_SPEC.md
+.pytest_cache/
+*.db
