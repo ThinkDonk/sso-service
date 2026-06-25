@@ -39,3 +39,16 @@ uvicorn app:app --reload
 ```
 
 （通过 .env 的 SSO_SEED_* 配置，仅首次启动时创建）
+
+
+## outline配置示例
+
+```
+OIDC_CLIENT_ID=outline
+OIDC_CLIENT_SECRET=change-me
+SSO_INTERNAL_URL=http://localhost:8000
+OIDC_AUTH_URI=http://localhost:8000/authorize
+OIDC_TOKEN_URI=http://localhost:8000/token
+OIDC_USERINFO_URI=http://localhost:8000/userinfo
+OIDC_LOGOUT_URI=http://localhost:8000/logout
+```
