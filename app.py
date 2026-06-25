@@ -16,13 +16,26 @@ logger = logging.getLogger("sso")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # TODO: P0 init_db() + seed_admin()
+    init_db()
+    seed_admin()
+    logger.info("SSO service started on %s:%s", settings.host, settings.port)
+    logger.info("Issuer: %s", settings.issuer_url)
+    logger.info("DB: %s", settings.db_path)
     yield
 
 
 def _create_app() -> FastAPI:
     app = FastAPI(title="SSO OIDC Service", docs_url="/docs", lifespan=lifespan)
     app.include_router(oidc_router)
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'unsafe-inline'"
+        return response
+
     return app
 
 
