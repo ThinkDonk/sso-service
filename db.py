@@ -6,57 +6,118 @@ from config import settings
 
 
 def get_conn() -> sqlite3.Connection:
-    # TODO: P0 implement - enable WAL, set row_factory=sqlite3.Row
-    pass
+    conn = sqlite3.connect(settings.db_path)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def init_db() -> None:
-    # TODO: P0 implement - create users/codes/access_tokens tables
-    pass
+    conn = get_conn()
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS users("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "username TEXT UNIQUE NOT NULL,"
+        "password_hash TEXT NOT NULL,"
+        "email TEXT NOT NULL,"
+        "name TEXT NOT NULL,"
+        "picture TEXT,"
+        "is_admin INTEGER DEFAULT 0"
+        ")"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS codes("
+        "code TEXT PRIMARY KEY,"
+        "user_id INTEGER NOT NULL,"
+        "redirect_uri TEXT NOT NULL,"
+        "code_challenge TEXT,"
+        "expires_at INTEGER NOT NULL"
+        ")"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS access_tokens("
+        "token TEXT PRIMARY KEY,"
+        "user_id INTEGER NOT NULL,"
+        "expires_at INTEGER NOT NULL"
+        ")"
+    )
+    conn.commit()
+    conn.close()
 
 
 # --- users ---
 
 def get_user_by_username(username: str) -> dict | None:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def get_user_by_id(user_id: int) -> dict | None:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def create_user(username: str, password_hash: str, email: str, name: str, is_admin: bool = False) -> int:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    cur = conn.execute(
+        "INSERT INTO users(username, password_hash, email, name, is_admin) VALUES(?,?,?,?,?)",
+        (username, password_hash, email, name, int(is_admin)),
+    )
+    conn.commit()
+    user_id = cur.lastrowid
+    assert user_id is not None
+    conn.close()
+    return user_id
 
 
 # --- codes ---
 
 def save_code(code: str, user_id: int, redirect_uri: str, code_challenge: str | None, expires_at: int) -> None:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO codes(code, user_id, redirect_uri, code_challenge, expires_at) VALUES(?,?,?,?,?)",
+        (code, user_id, redirect_uri, code_challenge, expires_at),
+    )
+    conn.commit()
+    conn.close()
 
 
 def consume_code(code: str) -> dict | None:
     """查询并删除 code（一次性消费），返回 code 记录或 None。"""
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM codes WHERE code=?", (code,)).fetchone()
+    conn.execute("DELETE FROM codes WHERE code=?", (code,))
+    conn.commit()
+    conn.close()
+    return dict(row) if row else None
 
 
 # --- access_tokens ---
 
 def save_token(token: str, user_id: int, expires_at: int) -> None:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO access_tokens(token, user_id, expires_at) VALUES(?,?,?)",
+        (token, user_id, expires_at),
+    )
+    conn.commit()
+    conn.close()
 
 
 def get_token(token: str) -> dict | None:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM access_tokens WHERE token=?", (token,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def delete_token(token: str) -> None:
-    # TODO: P0 implement
-    pass
+    conn = get_conn()
+    conn.execute("DELETE FROM access_tokens WHERE token=?", (token,))
+    conn.commit()
+    conn.close()
