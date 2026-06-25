@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sso-service"
+version = "0.1.0"
+description = "OIDC authentication service for Outline Wiki"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "pyjwt>=2.8.0",
+    "passlib[bcrypt]>=1.7.4",
+    "jinja2>=3.1.3",
+    "pydantic-settings>=2.2.0",
+    "python-multipart>=0.0.9",
+]
+
+[tool.setuptools]
+packages = []
