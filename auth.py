@@ -7,28 +7,43 @@ _pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    # TODO: P0 implement - hash password with bcrypt
-    pass
+    return _pwd_ctx.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    # TODO: P0 implement - verify password against hash
-    pass
+    return _pwd_ctx.verify(password, password_hash)
 
 
 def authenticate(username: str, password: str) -> dict | None:
-    """Verify credentials, return user dict or None."""
-    # TODO: P0 implement
-    pass
+    user = get_user_by_username(username)
+    if user is None:
+        return None
+    if not verify_password(password, user["password_hash"]):
+        return None
+    return dict(user)
 
 
 def seed_admin() -> None:
-    """Insert seed admin if users table is empty."""
-    # TODO: P0 implement
-    pass
+    if get_user_by_username(settings.seed_username) is not None:
+        return
+    create_user(
+        username=settings.seed_username,
+        password_hash=hash_password(settings.seed_password),
+        email=settings.seed_email,
+        name=settings.seed_name,
+        is_admin=True,
+    )
 
 
 def user_to_claims(user: dict) -> dict:
-    """Convert user record to OIDC claims (sub/email/name/preferred_username/picture)."""
-    # TODO: P0 implement
-    pass
+    claims = {
+        "sub": str(user["id"]),
+        "email": user["email"],
+        "email_verified": True,
+        "preferred_username": user["username"],
+        "name": user["name"],
+    }
+    picture = user.get("picture")
+    if picture is not None:
+        claims["picture"] = picture
+    return claims
