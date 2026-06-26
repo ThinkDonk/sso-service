@@ -4,6 +4,7 @@ import hashlib
 import secrets
 import time
 from typing import Optional
+from urllib.parse import urlparse
 
 import jwt
 from fastapi import APIRouter, Form, Query, Request
@@ -48,6 +49,7 @@ def well_known():
         "authorization_endpoint": f"{settings.issuer_url}/authorize",
         "token_endpoint": f"{settings.issuer_url}/token",
         "userinfo_endpoint": f"{settings.issuer_url}/userinfo",
+        "end_session_endpoint": f"{settings.issuer_url}/logout",
         "jwks_uri": f"{settings.issuer_url}/.well-known/jwks.json",
         "scopes_supported": ["openid", "profile", "email"],
         "response_types_supported": ["code"],
@@ -172,3 +174,43 @@ def userinfo(request: Request):
     user = get_user_by_id(token_record["user_id"])
     claims = user_to_claims(user)
     return JSONResponse(claims)
+
+
+@router.get("/logout")
+def logout(request: Request):
+    allowed_origins = set()
+    for uri in settings.redirect_uri_list:
+        parsed = urlparse(uri)
+        if parsed.scheme and parsed.netloc:
+            allowed_origins.add(f"{parsed.scheme}://{parsed.netloc}")
+    referer = request.headers.get("referer")
+    target = None
+    if referer:
+        rp = urlparse(referer)
+        if rp.scheme and rp.netloc:
+            origin = f"{rp.scheme}://{rp.netloc}"
+            if origin in allowed_origins:
+                target = origin + "/"
+    if target:
+        return RedirectResponse(target, status_code=302)
+    return HTMLResponse("""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>已登出</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.card { background: #fff; padding: 2rem 2.5rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 360px; width: 100%; text-align: center; }
+h1 { font-size: 1.25rem; margin-bottom: 1rem; color: #333; }
+p { color: #6b7280; font-size: 0.9rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="card">
+<h1>已登出</h1>
+<p>您已成功退出登录。您可以关闭此页面，或重新登录。</p>
+</div>
+</body>
+</html>""")
