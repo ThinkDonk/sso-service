@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     session_secret: str = "change-me"
     session_max_age: int = 28800
 
+    page_size: int = 20
+
     @property
     def redirect_uri_list(self) -> list[str]:
         return [u.strip() for u in self.redirect_uris.split(",") if u.strip()]

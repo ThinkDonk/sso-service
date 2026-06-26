@@ -352,3 +352,228 @@ def test_logout(client):
     r2 = client.get("/admin/", follow_redirects=False)
     assert r2.status_code == 303
     assert "/admin/login" in r2.headers["location"]
+
+
+# ---------------------------------------------------------------------------
+# Search & pagination
+# ---------------------------------------------------------------------------
+
+def test_search_users(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    for uname, name, email in [("alice", "Alice", "alice@x.com"), ("bob", "Bob", "bob@x.com")]:
+        r = client.post("/admin/users", data={
+            "csrf_token": csrf, "username": uname, "password": "pw123",
+            "name": name, "email": email,
+        }, follow_redirects=False)
+        assert r.status_code == 303
+    r = client.get("/admin/?search=alice")
+    assert r.status_code == 200
+    assert "alice" in r.text
+    assert "bob" not in r.text
+    r = client.get("/admin/?search=bob@x.com")
+    assert r.status_code == 200
+    assert "bob" in r.text
+    assert "alice" not in r.text
+
+
+def test_search_no_match(client):
+    login(client)
+    r = client.get("/admin/?search=nonexistentuser12345")
+    assert r.status_code == 200
+    assert "共 0 条" in r.text
+
+
+def test_pagination(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "page_size", 2)
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    for uname in ["u1", "u2", "u3"]:
+        r = client.post("/admin/users", data={
+            "csrf_token": csrf, "username": uname, "password": "pw123",
+            "name": uname, "email": uname + "@x.com",
+        }, follow_redirects=False)
+        assert r.status_code == 303
+    r = client.get("/admin/?page=1")
+    assert r.status_code == 200
+    assert "第 1/2 页" in r.text
+    r = client.get("/admin/?page=2")
+    assert r.status_code == 200
+    assert "第 2/2 页" in r.text
+
+
+def test_pagination_out_of_range(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "page_size", 2)
+    login(client)
+    r = client.get("/admin/?page=999")
+    assert r.status_code == 200
+    assert "第 1/1 页" in r.text
+
+
+def test_pagination_invalid_page(client):
+    login(client)
+    r = client.get("/admin/?page=abc")
+    assert r.status_code == 200
+    assert "第 1/" in r.text
+
+
+# ---------------------------------------------------------------------------
+# Email/name validation
+# ---------------------------------------------------------------------------
+
+def test_create_user_empty_email(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    r = client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "Name", "email": "",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "err=invalid_input" in r.headers["location"]
+
+
+def test_create_user_empty_name(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    r = client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "", "email": "u1@x.com",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "err=invalid_input" in r.headers["location"]
+
+
+def test_edit_user_empty_email_rejected(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "Name", "email": "u1@x.com",
+    }, follow_redirects=False)
+    target = get_user_by_username("u1")
+    assert target is not None
+    csrf = get_csrf(client, "/admin/")
+    r = client.post(f"/admin/users/{target['id']}/edit", data={
+        "csrf_token": csrf, "name": "Name", "email": "",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "err=invalid_input" in r.headers["location"]
+
+
+# ---------------------------------------------------------------------------
+# Enable/disable user
+# ---------------------------------------------------------------------------
+
+def test_disable_user(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "Name", "email": "u1@x.com",
+    }, follow_redirects=False)
+    target = get_user_by_username("u1")
+    csrf = get_csrf(client, "/admin/")
+    r = client.post(f"/admin/users/{target['id']}/toggle-active", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "msg=user_disabled" in r.headers["location"]
+    t = get_user_by_id(target["id"])
+    assert t["is_active"] == 0
+
+
+def test_enable_user(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "Name", "email": "u1@x.com",
+    }, follow_redirects=False)
+    target = get_user_by_username("u1")
+    csrf = get_csrf(client, "/admin/")
+    client.post(f"/admin/users/{target['id']}/toggle-active", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    csrf = get_csrf(client, "/admin/")
+    r = client.post(f"/admin/users/{target['id']}/toggle-active", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "msg=user_enabled" in r.headers["location"]
+    t = get_user_by_id(target["id"])
+    assert t["is_active"] == 1
+
+
+def test_disable_self_rejected(client):
+    login(client)
+    admin = get_user_by_username("admin")
+    csrf = get_csrf(client, "/admin/")
+    r = client.post(f"/admin/users/{admin['id']}/toggle-active", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    assert "err=cannot_disable_self" in r.headers["location"]
+
+
+# test_disable_last_admin_rejected is intentionally omitted.
+# The last_admin guard in toggle-active is practically unreachable:
+#   - The actor must be an admin (endpoint requires _require_admin).
+#   - The target must also be an admin for the check to trigger.
+#   - count_admins() counts ALL users with is_admin=1 (active or not).
+#   - With the actor as an admin, count_admins() >= 1.
+#     If target != actor then count >= 2 so "<= 1" never matches.
+#     If target == actor then cannot_disable_self fires first.
+#   - There is no code path where count_admins() == 1 with a
+#     different admin who is the actor. The check exists as a
+#     belt-and-suspenders safety but cannot be exercised via
+#     normal API usage.
+
+
+def test_disabled_user_cannot_login(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "Name", "email": "u1@x.com",
+    }, follow_redirects=False)
+    r_login = login(client, "u1", "pw123")
+    assert r_login.status_code == 303
+    assert "account" in r_login.headers["location"]
+    csrf = get_csrf(client, "/admin/account")
+    client.post("/admin/logout", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    login(client, "admin", "admin123")
+    target = get_user_by_username("u1")
+    csrf = get_csrf(client, "/admin/")
+    client.post(f"/admin/users/{target['id']}/toggle-active", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    csrf = get_csrf(client, "/admin/")
+    client.post("/admin/logout", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    csrf = get_csrf(client, "/admin/login")
+    r = client.post("/admin/login", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+    }, follow_redirects=False)
+    assert r.status_code == 200
+    assert "用户名或密码错误" in r.text
+
+
+def test_disable_revokes_token(client):
+    login(client)
+    csrf = get_csrf(client, "/admin/")
+    client.post("/admin/users", data={
+        "csrf_token": csrf, "username": "u1", "password": "pw123",
+        "name": "Name", "email": "u1@x.com",
+    }, follow_redirects=False)
+    target = get_user_by_username("u1")
+    token_val = "tok-disable-" + str(int(time.time()))
+    save_token(token_val, target["id"], int(time.time()) + 3600)
+    assert get_token(token_val) is not None
+    csrf = get_csrf(client, "/admin/")
+    client.post(f"/admin/users/{target['id']}/toggle-active", data={
+        "csrf_token": csrf,
+    }, follow_redirects=False)
+    assert get_token(token_val) is None

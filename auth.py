@@ -20,6 +20,8 @@ def authenticate(username: str, password: str) -> dict | None:
         return None
     if not verify_password(password, user["password_hash"]):
         return None
+    if not bool(user.get("is_active", 1)):
+        return None
     return dict(user)
 
 

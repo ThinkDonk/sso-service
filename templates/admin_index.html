@@ -1,129 +1,197 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>用户管理</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 2rem 1rem; }
-.card { background: #fff; padding: 2rem 2.5rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 900px; }
-h1 { font-size: 1.25rem; margin-bottom: 1.5rem; color: #333; }
-.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.header-row .user-info { color: #666; font-size: 0.9rem; }
-.header-row .logout-form { display: inline; }
-.header-row .logout-form button { padding: 0.4rem 0.8rem; background: #9ca3af; color: #fff; border: none; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
-.header-row .logout-form button:hover { background: #6b7280; }
-.error { color: #dc2626; font-size: 0.85rem; margin-bottom: 1rem; }
-.success { color: #16a34a; font-size: 0.85rem; margin-bottom: 1rem; }
-section { margin-bottom: 2rem; }
-section h2 { font-size: 1rem; margin-bottom: 0.75rem; color: #555; border-bottom: 1px solid #eee; padding-bottom: 0.5rem; }
-.form-row { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.form-group { display: flex; flex-direction: column; }
-.form-group label { font-size: 0.8rem; color: #555; margin-bottom: 0.15rem; }
-.form-group input[type="text"], .form-group input[type="password"], .form-group input[type="email"] { padding: 0.45rem 0.6rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; width: 130px; }
-.form-group input:focus { outline: none; border-color: #2563eb; }
-.form-group.checkbox { flex-direction: row; align-items: center; gap: 0.3rem; }
-.form-group.checkbox label { margin-bottom: 0; }
-.form-group.checkbox input[type="checkbox"] { width: auto; }
-.form-row button { padding: 0.45rem 0.8rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-size: 0.85rem; cursor: pointer; white-space: nowrap; }
-.form-row button:hover { background: #1d4ed8; }
-.form-row button.danger { background: #dc2626; }
-.form-row button.danger:hover { background: #b91c1c; }
-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-th, td { padding: 0.55rem 0.6rem; text-align: left; border-bottom: 1px solid #eee; }
-th { color: #555; font-weight: 600; background: #fafafa; }
-tr:hover { background: #f9fafb; }
-tr.current-user { background: #eff6ff; }
-td .inline-form { display: flex; gap: 0.3rem; align-items: center; flex-wrap: wrap; }
-td .inline-form input[type="text"], td .inline-form input[type="password"], td .inline-form input[type="email"] { padding: 0.3rem 0.4rem; border: 1px solid #ddd; border-radius: 3px; font-size: 0.8rem; width: 90px; }
-td .inline-form input:focus { outline: none; border-color: #2563eb; }
-td .inline-form label { font-size: 0.75rem; color: #888; }
-td .inline-form button { padding: 0.3rem 0.5rem; font-size: 0.8rem; }
-td .inline-form .checkbox { display: flex; align-items: center; gap: 0.2rem; }
-td .admin-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; background: #dbeafe; color: #1d4ed8; }
-td .user-badge { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.75rem; background: #f3f4f6; color: #6b7280; }
-</style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}用户管理 - 管理后台{% endblock %}
+{% block nav_users %}active{% endblock %}
+
+{% block content %}
+<h1 class="page-title">用户管理</h1>
+
+{% if message == "created" %}<div class="message success">用户已创建</div>
+{% elif message == "edited" %}<div class="message success">用户信息已更新</div>
+{% elif message == "deleted" %}<div class="message success">用户已删除</div>
+{% elif message == "password_reset" %}<div class="message success">密码已重置</div>
+{% elif message == "user_enabled" %}<div class="message success">用户已启用</div>
+{% elif message == "user_disabled" %}<div class="message success">用户已禁用</div>
+{% endif %}
+{% if error == "invalid_input" %}<div class="message error">输入不能为空</div>
+{% elif error == "user_exists" %}<div class="message error">用户名已存在</div>
+{% elif error == "empty_password" %}<div class="message error">密码不能为空</div>
+{% elif error == "cannot_demote_self" %}<div class="message error">不能将自己降级为普通用户</div>
+{% elif error == "last_admin" %}<div class="message error">不能移除最后一位管理员</div>
+{% elif error == "cannot_delete_self" %}<div class="message error">不能删除自己</div>
+{% elif error == "cannot_disable_self" %}<div class="message error">不能禁用自己</div>
+{% endif %}
+
 <div class="card">
-<div class="header-row">
-<h1>用户管理</h1>
-<div class="user-info">
-当前用户：{{ current_user.username }}
-<form class="logout-form" method="post" action="/admin/logout">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<button type="submit">退出登录</button>
-</form>
-</div>
+  <div class="toolbar">
+    <form class="search-form" method="get" action="/admin/">
+      <input type="search" name="search" value="{{ search }}" placeholder="搜索用户名、姓名或邮箱">
+      <button type="submit">搜索</button>
+    </form>
+    <button type="button" class="btn" onclick="openModal('modal-create')">+ 新增用户</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>ID</th><th>用户名</th><th>姓名</th><th>邮箱</th><th>角色</th><th>操作</th></tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr class="{% if user.id == current_user.id %}current-user{% endif %}{% if not user.is_active %} disabled-row{% endif %}">
+        <td>{{ user.id }}</td>
+        <td>{{ user.username }}</td>
+        <td>{{ user.name }}</td>
+        <td>{{ user.email }}</td>
+        <td>
+          {% if user.is_admin %}<span class="badge badge-admin">管理员</span>
+          {% else %}<span class="badge badge-user">普通用户</span>{% endif %}
+          {% if not user.is_active %}<span class="badge badge-disabled">已禁用</span>{% endif %}
+        </td>
+        <td>
+          <div class="action-btns">
+            {% if user.is_active %}
+            <button class="btn btn-secondary btn-sm" onclick="openToggleActive({{ user.id }})">禁用</button>
+            {% else %}
+            <button class="btn btn-sm" onclick="openToggleActive({{ user.id }})">启用</button>
+            {% endif %}
+            <button class="btn btn-sm" data-id="{{ user.id }}" data-name="{{ user.name }}" data-email="{{ user.email }}" data-admin="{{ user.is_admin|int }}" onclick="openEditModal(this.dataset.id, this.dataset.name, this.dataset.email, this.dataset.admin)">编辑</button>
+            <button class="btn btn-secondary btn-sm" data-id="{{ user.id }}" data-username="{{ user.username }}" onclick="openResetModal(this.dataset.id, this.dataset.username)">重置密码</button>
+            <button class="btn btn-danger btn-sm" data-id="{{ user.id }}" data-username="{{ user.username }}" onclick="openDeleteModal(this.dataset.id, this.dataset.username)">删除</button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not users %}
+      <tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:32px;">暂无用户</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <div>共 {{ total }} 条，第 {{ page }}/{{ total_pages }} 页</div>
+    <div class="pages">
+      {% if page > 1 %}
+      <a href="/admin/?search={{ search|urlencode }}&page={{ page - 1 }}">上一页</a>
+      {% else %}
+      <span class="disabled">上一页</span>
+      {% endif %}
+      <span class="current">{{ page }}</span>
+      {% if page < total_pages %}
+      <a href="/admin/?search={{ search|urlencode }}&page={{ page + 1 }}">下一页</a>
+      {% else %}
+      <span class="disabled">下一页</span>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
-{% if message == "created" %}<p class="success">用户已创建</p>
-{% elif message == "password_reset" %}<p class="success">密码已重置</p>
-{% elif message == "edited" %}<p class="success">用户信息已更新</p>
-{% elif message == "deleted" %}<p class="success">用户已删除</p>{% endif %}
-
-{% if error == "invalid_input" %}<p class="error">用户名和密码不能为空</p>
-{% elif error == "user_exists" %}<p class="error">用户名已存在</p>
-{% elif error == "empty_password" %}<p class="error">密码不能为空</p>
-{% elif error == "cannot_demote_self" %}<p class="error">不能将自己降级为普通用户</p>
-{% elif error == "last_admin" %}<p class="error">不能移除最后一位管理员</p>
-{% elif error == "cannot_delete_self" %}<p class="error">不能删除自己</p>{% endif %}
-
-<section>
-<h2>新增用户</h2>
-<form method="post" action="/admin/users">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<div class="form-row">
-<div class="form-group"><label>用户名</label><input type="text" name="username" required></div>
-<div class="form-group"><label>密码</label><input type="password" name="password" required></div>
-<div class="form-group"><label>姓名</label><input type="text" name="name" required></div>
-<div class="form-group"><label>邮箱</label><input type="email" name="email" required></div>
-<div class="form-group checkbox"><input type="checkbox" name="is_admin" value="1" id="create_is_admin"><label for="create_is_admin">管理员</label></div>
-<button type="submit">创建</button>
+<div class="modal-overlay" id="modal-create">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-create')">&times;</button>
+    <h2 class="modal-title">新增用户</h2>
+    <form action="/admin/users" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="search" value="{{ search }}">
+      <input type="hidden" name="page" value="{{ page }}">
+      <div class="form-group"><label>用户名</label><input type="text" name="username" required></div>
+      <div class="form-group"><label>密码</label><input type="password" name="password" required></div>
+      <div class="form-group"><label>姓名</label><input type="text" name="name" required></div>
+      <div class="form-group"><label>邮箱</label><input type="email" name="email" required></div>
+      <div class="form-group checkbox-group"><input type="checkbox" name="is_admin" value="1" id="create_is_admin"><label for="create_is_admin" style="margin:0">设为管理员</label></div>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('modal-create')">取消</button><button type="submit">创建</button></div>
+    </form>
+  </div>
 </div>
-</form>
-</section>
 
-<section>
-<h2>用户列表</h2>
-<table>
-<thead>
-<tr><th>ID</th><th>用户名</th><th>姓名</th><th>邮箱</th><th>角色</th><th>操作</th></tr>
-</thead>
-<tbody>
-{% for user in users %}
-<tr{% if user.id == current_user.id %} class="current-user"{% endif %}>
-<td>{{ user.id }}</td>
-<td>{{ user.username }}</td>
-<td>{{ user.name }}</td>
-<td>{{ user.email }}</td>
-<td>{% if user.is_admin %}<span class="admin-badge">管理员</span>{% else %}<span class="user-badge">普通</span>{% endif %}</td>
-<td>
-<div class="inline-form">
-<form method="post" action="/admin/users/{{ user.id }}/password">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<input type="password" name="new_password" placeholder="新密码" required>
-<button type="submit">重置密码</button>
-</form>
-<form method="post" action="/admin/users/{{ user.id }}/edit">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<input type="text" name="name" value="{{ user.name }}" required>
-<input type="email" name="email" value="{{ user.email }}" required>
-<span class="checkbox"><input type="checkbox" name="is_admin" value="1"{% if user.is_admin %} checked{% endif %}> 管理员</span>
-<button type="submit">保存</button>
-</form>
-<form method="post" action="/admin/users/{{ user.id }}/delete">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<button type="submit" class="danger" onclick="return confirm('确认删除？')">删除</button>
-</form>
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-edit')">&times;</button>
+    <h2 class="modal-title">编辑用户</h2>
+    <form id="form-edit" action="" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="search" value="{{ search }}">
+      <input type="hidden" name="page" value="{{ page }}">
+      <div class="form-group"><label>姓名</label><input type="text" name="name" id="edit-name" required></div>
+      <div class="form-group"><label>邮箱</label><input type="email" name="email" id="edit-email" required></div>
+      <div class="form-group checkbox-group"><input type="checkbox" name="is_admin" value="1" id="edit_is_admin"><label for="edit_is_admin" style="margin:0">管理员</label></div>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit')">取消</button><button type="submit">保存</button></div>
+    </form>
+  </div>
 </div>
-</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</section>
+
+<div class="modal-overlay" id="modal-reset">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-reset')">&times;</button>
+    <h2 class="modal-title">重置密码</h2>
+    <form id="form-reset" action="" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="search" value="{{ search }}">
+      <input type="hidden" name="page" value="{{ page }}">
+      <div class="modal-body"><p>将为用户 <strong id="reset-username"></strong> 设置新密码，其现有访问令牌将被吊销。</p></div>
+      <div class="form-group"><label>新密码</label><input type="password" name="new_password" required></div>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('modal-reset')">取消</button><button type="submit" class="btn-danger">确认重置</button></div>
+    </form>
+  </div>
 </div>
-</body>
-</html>
+
+<div class="modal-overlay" id="modal-delete">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-delete')">&times;</button>
+    <h2 class="modal-title">确认删除</h2>
+    <form id="form-delete" action="" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="search" value="{{ search }}">
+      <input type="hidden" name="page" value="{{ page }}">
+      <div class="modal-body"><p>确定要删除用户 <strong id="delete-username"></strong> 吗？此操作不可撤销，其访问令牌将被吊销。</p></div>
+      <div class="modal-actions"><button type="button" class="btn btn-secondary" onclick="closeModal('modal-delete')">取消</button><button type="submit" class="btn-danger">确认删除</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openEditModal(id, name, email, isAdmin) {
+  document.getElementById('form-edit').action = '/admin/users/' + id + '/edit';
+  document.getElementById('edit-name').value = name;
+  document.getElementById('edit-email').value = email;
+  document.getElementById('edit_is_admin').checked = (isAdmin === '1');
+  openModal('modal-edit');
+}
+
+function openResetModal(id, username) {
+  document.getElementById('form-reset').action = '/admin/users/' + id + '/password';
+  document.getElementById('reset-username').textContent = username;
+  openModal('modal-reset');
+}
+
+function openDeleteModal(id, username) {
+  document.getElementById('form-delete').action = '/admin/users/' + id + '/delete';
+  document.getElementById('delete-username').textContent = username;
+  openModal('modal-delete');
+}
+
+function openToggleActive(id) {
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/admin/users/' + id + '/toggle-active';
+  form.innerHTML = '<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="search" value="{{ search }}"><input type="hidden" name="page" value="{{ page }}">';
+  document.body.appendChild(form);
+  form.submit();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(function(m) { m.classList.remove('open'); });
+  }
+});
+</script>
+{% endblock %}

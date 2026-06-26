@@ -23,7 +23,8 @@ def init_db() -> None:
         "email TEXT NOT NULL,"
         "name TEXT NOT NULL,"
         "picture TEXT,"
-        "is_admin INTEGER DEFAULT 0"
+        "is_admin INTEGER DEFAULT 0,"
+        "is_active INTEGER NOT NULL DEFAULT 1"
         ")"
     )
     conn.execute(
@@ -51,6 +52,11 @@ def init_db() -> None:
         "ts INTEGER NOT NULL"
         ")"
     )
+    # migration: add is_active column for existing databases
+    cols = conn.execute("PRAGMA table_info(users)").fetchall()
+    col_names = [row["name"] for row in cols]
+    if "is_active" not in col_names:
+        conn.execute("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
     conn.commit()
     conn.close()
 
@@ -132,11 +138,35 @@ def delete_token(token: str) -> None:
     conn.close()
 
 
-def list_users() -> list[dict]:
+def list_users(search: str = "", offset: int = 0, limit: int = 20) -> list[dict]:
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
+    if search:
+        like = f"%{search}%"
+        rows = conn.execute(
+            "SELECT * FROM users WHERE username LIKE ? OR name LIKE ? OR email LIKE ? ORDER BY id LIMIT ? OFFSET ?",
+            (like, like, like, limit, offset),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM users ORDER BY id LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+def count_users(search: str = "") -> int:
+    conn = get_conn()
+    if search:
+        like = f"%{search}%"
+        row = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM users WHERE username LIKE ? OR name LIKE ? OR email LIKE ?",
+            (like, like, like),
+        ).fetchone()
+    else:
+        row = conn.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()
+    conn.close()
+    return row["cnt"] if row else 0
 
 
 def update_user_password(user_id: int, password_hash: str) -> None:
@@ -169,6 +199,13 @@ def delete_user(user_id: int) -> None:
 def delete_tokens_by_user(user_id: int) -> None:
     conn = get_conn()
     conn.execute("DELETE FROM access_tokens WHERE user_id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_user_active(user_id: int, is_active: int) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET is_active=? WHERE id=?", (is_active, user_id))
     conn.commit()
     conn.close()
 

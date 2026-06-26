@@ -1,48 +1,93 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>修改密码</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-.card { background: #fff; padding: 2rem 2.5rem; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 360px; }
-h1 { font-size: 1.25rem; margin-bottom: 1.5rem; color: #333; text-align: center; }
-label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; color: #555; }
-input[type="text"], input[type="password"] { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.95rem; margin-bottom: 1rem; }
-input:focus { outline: none; border-color: #2563eb; }
-button { width: 100%; padding: 0.65rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
-button:hover { background: #1d4ed8; }
-.error { color: #dc2626; font-size: 0.85rem; margin-bottom: 1rem; text-align: center; }
-.success { color: #16a34a; font-size: 0.85rem; margin-bottom: 1rem; text-align: center; }
-.logout-form { margin-top: 1.5rem; text-align: center; }
-.logout-form button { background: #9ca3af; }
-.logout-form button:hover { background: #6b7280; }
-</style>
-</head>
-<body>
-<div class="card">
-<h1>修改密码</h1>
-<p style="text-align:center;margin-bottom:1rem;color:#666;">当前用户：{{ current_user.username }}</p>
-{% if message == "password_changed" %}<p class="success">密码修改成功</p>{% endif %}
-{% if error == "wrong_password" %}<p class="error">当前密码错误</p>{% endif %}
-{% if error == "empty_password" %}<p class="error">新密码不能为空</p>{% endif %}
-{% if error == "password_mismatch" %}<p class="error">两次密码不一致</p>{% endif %}
-<form method="post" action="/admin/account">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<label for="current_password">当前密码</label>
-<input type="password" id="current_password" name="current_password" required>
-<label for="new_password">新密码</label>
-<input type="password" id="new_password" name="new_password" required>
-<label for="confirm_password">确认新密码</label>
-<input type="password" id="confirm_password" name="confirm_password" required>
-<button type="submit">修改密码</button>
-</form>
-<form class="logout-form" method="post" action="/admin/logout">
-<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-<button type="submit">退出登录</button>
-</form>
+{% extends "base.html" %}
+{% block title %}修改密码 - 管理后台{% endblock %}
+{% block nav_account %}active{% endblock %}
+
+{% block content %}
+<h1 class="page-title">修改密码</h1>
+
+{% if message == "password_changed" %}<div class="message success">密码修改成功</div>{% endif %}
+{% if error == "wrong_password" %}<div class="message error">当前密码错误</div>
+{% elif error == "empty_password" %}<div class="message error">新密码不能为空</div>
+{% elif error == "password_mismatch" %}<div class="message error">两次密码不一致</div>
+{% endif %}
+
+<div class="hint">为保障账号安全，请定期更换密码。修改成功后，您已签发的访问令牌将自动失效。</div>
+
+<div class="card" style="max-width:480px;">
+  <form action="/admin/account" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-group">
+      <label for="current_password">当前密码</label>
+      <div class="input-wrap">
+        <input type="password" name="current_password" id="current_password" required>
+        <button type="button" class="toggle-pw" data-target="current_password">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="new_password">新密码</label>
+      <div class="input-wrap">
+        <input type="password" name="new_password" id="new_password" required>
+        <button type="button" class="toggle-pw" data-target="new_password">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="confirm_password">确认新密码</label>
+      <div class="input-wrap">
+        <input type="password" name="confirm_password" id="confirm_password" required>
+        <button type="button" class="toggle-pw" data-target="confirm_password">👁</button>
+      </div>
+    </div>
+    <button type="submit" class="btn-block">修改密码</button>
+  </form>
 </div>
-</body>
-</html>
+
+<style>
+  .hint {
+    background: #f0f9ff;
+    color: #1e40af;
+    padding: 10px 16px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    border: 1px solid #bfdbfe;
+  }
+  .input-wrap {
+    position: relative;
+  }
+  .input-wrap input {
+    width: 100%;
+    padding-right: 40px;
+  }
+  .toggle-pw {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1rem;
+    z-index: 1;
+    padding: 0;
+    line-height: 1;
+  }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.toggle-pw').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var targetId = this.getAttribute('data-target');
+    var input = document.getElementById(targetId);
+    if (input.type === 'password') {
+      input.type = 'text';
+      this.textContent = '\ud83d\ude48';
+    } else {
+      input.type = 'password';
+      this.textContent = '\ud83d\udc41';
+    }
+  });
+});
+</script>
+{% endblock %}
