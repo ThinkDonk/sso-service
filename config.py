@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     access_token_expires: int = 3600
     code_expires: int = 600
 
+    session_secret: str = "change-me"
+    session_max_age: int = 28800
+
     @property
     def redirect_uri_list(self) -> list[str]:
         return [u.strip() for u in self.redirect_uris.split(",") if u.strip()]

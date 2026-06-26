@@ -42,6 +42,15 @@ def init_db() -> None:
         "expires_at INTEGER NOT NULL"
         ")"
     )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS audit("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "actor_id INTEGER NOT NULL,"
+        "action TEXT NOT NULL,"
+        "target_id INTEGER,"
+        "ts INTEGER NOT NULL"
+        ")"
+    )
     conn.commit()
     conn.close()
 
@@ -119,5 +128,63 @@ def get_token(token: str) -> dict | None:
 def delete_token(token: str) -> None:
     conn = get_conn()
     conn.execute("DELETE FROM access_tokens WHERE token=?", (token,))
+    conn.commit()
+    conn.close()
+
+
+def list_users() -> list[dict]:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def update_user_password(user_id: int, password_hash: str) -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        (password_hash, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_user_info(user_id: int, name: str, email: str, is_admin: bool) -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET name=?, email=?, is_admin=? WHERE id=?",
+        (name, email, int(is_admin), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_user(user_id: int) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def delete_tokens_by_user(user_id: int) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM access_tokens WHERE user_id=?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def count_admins() -> int:
+    conn = get_conn()
+    row = conn.execute("SELECT COUNT(*) as cnt FROM users WHERE is_admin=1").fetchone()
+    conn.close()
+    return row["cnt"] if row else 0
+
+
+def record_audit(actor_id: int, action: str, target_id: int | None) -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO audit(actor_id, action, target_id, ts) VALUES(?,?,?,?)",
+        (actor_id, action, target_id, int(time.time())),
+    )
     conn.commit()
     conn.close()
