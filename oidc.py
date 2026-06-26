@@ -4,8 +4,6 @@ import hashlib
 import secrets
 import time
 from typing import Optional
-from urllib.parse import urlparse
-
 import jwt
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -177,22 +175,7 @@ def userinfo(request: Request):
 
 
 @router.get("/logout")
-def logout(request: Request):
-    allowed_origins = set()
-    for uri in settings.redirect_uri_list:
-        parsed = urlparse(uri)
-        if parsed.scheme and parsed.netloc:
-            allowed_origins.add(f"{parsed.scheme}://{parsed.netloc}")
-    referer = request.headers.get("referer")
-    target = None
-    if referer:
-        rp = urlparse(referer)
-        if rp.scheme and rp.netloc:
-            origin = f"{rp.scheme}://{rp.netloc}"
-            if origin in allowed_origins:
-                target = origin + "/"
-    if target:
-        return RedirectResponse(target, status_code=302)
+def logout():
     return HTMLResponse("""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>

@@ -236,22 +236,14 @@ def test_well_known_has_end_session_endpoint(client):
     assert data["end_session_endpoint"].endswith("/logout")
 
 
-def test_logout_with_valid_referer_redirects(client):
-    first_uri = settings.redirect_uri_list[0]
-    parsed = urlparse(first_uri)
-    origin = f"{parsed.scheme}://{parsed.netloc}"
-    resp = client.get("/logout", headers={"Referer": first_uri}, follow_redirects=False)
-    assert resp.status_code == 302
-    assert resp.headers["location"] == origin + "/"
-
-
-def test_logout_without_referer_shows_page(client):
-    resp = client.get("/logout", follow_redirects=False)
+def test_logout_returns_static_page(client):
+    resp = client.get("/logout")
     assert resp.status_code == 200
     assert "已登出" in resp.text
 
 
 def test_logout_with_foreign_referer_shows_page(client):
-    resp = client.get("/logout", headers={"Referer": "https://evil.example.com/home"}, follow_redirects=False)
+    # 即使带 Referer 也只返回静态页，不重定向（防循环 bug 回归）
+    resp = client.get("/logout", headers={"Referer": "https://evil.example.com/home"})
     assert resp.status_code == 200
     assert "已登出" in resp.text
